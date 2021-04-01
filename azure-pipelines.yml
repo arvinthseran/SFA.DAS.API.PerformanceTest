@@ -95,4 +95,6 @@ steps:
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Artifact'
   inputs:
-    pathtoPublish: '$(build.artifactstagingdirectory)/publish'
+    pathtoPublish: '- task: PublishHtmlReport@1
+  inputs:
+    reportDir: '$(build.artifactstagingdirectory)/TestReports'/publish'
