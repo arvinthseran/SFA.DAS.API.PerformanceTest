@@ -27,4 +27,4 @@ steps:
   inputs:
     pathtoPublish: '- task: PublishHtmlReport@1
   inputs:
-    reportDir: '$(build.artifactstagingdirectory)/TestReports'/publish'
+    reportDir: '$(Build.SourcesDirectory)/TestReports'
