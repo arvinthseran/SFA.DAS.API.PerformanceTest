@@ -1,30 +1,75 @@
+parameters:
+- name: NumberOfThreads
+  type: number
+  default: 1
+- name: RampUpDurationInSeconds
+  type: number  
+  default: 1
+- name: NumberOfLoops
+  type: number
+  default: 1
+- name: TestDurationInSeconds
+  type: number  
+  default: 10
+
+pr: none
+
 trigger:
   batch: true
   branches:
     include:
-      - "*"
-
-pr: none
-
-workspace:
-    clean: all
+    - "*"
+  paths:
+    include:
+    - JMeterPipelinePOC/*
 
 variables:
-  buildConfiguration: 'release'
+- name: PathToJmeter
+  value: C:/ProgramData/chocolatey/lib/jmeter/tools/apache-jmeter-5.2.1/bin/jmeter
+- name: PathToSolution
+  value: $(System.DefaultWorkingDirectory)/SFA.DAS.API.PerformanceTest
+- name: ProjectName
+  value: EPAO-Register-API
+- name: ScriptName
+  value: EPAO_Register.jmx
+- name: TestReportFolderName
+  value: $[format('TestReports{0:ddMMyy}_{0:HHmmssfffff}', pipeline.startTime)]
+- group: PREPROD Performance Test Suite Variables
 
-pool:
-  name: 'DAS - Continuous Integration'
-  demands: Agent.OS -equals Linux
-
-steps:
-- task: gittools.gitversion-preview.gitversion-task.GitVersion@5
-  displayName: GitVersion
-  inputs:
-    updateAssemblyInfo: true
-
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact'
-  inputs:
-    pathtoPublish: '- task: PublishHtmlReport@1
-  inputs:
-    reportDir: '$(Build.SourcesDirectory)/TestReports'
+stages:
+- stage: PerformanceTest
+  jobs:
+  - job: PerformanceTest
+    displayName: Performance Test
+    pool:
+      vmImage: windows-2019
+    steps:
+    - task: replacetokens@3
+      displayName: 'Replace tokens in **/*.csv'
+      inputs:
+        rootDirectory: '$(System.DefaultWorkingDirectory)/SFA.DAS.API.PerformanceTest/EPAO-Register-API'
+        targetFiles: '**/*.csv'
+        verbosity: detailed
+        tokenPrefix: '__'
+        tokenSuffix: '__'
+    - script: 'choco install jmeter --version 5.2.1'
+      displayName: 'Install JMeter'
+    - script: 'refreshenv'
+      displayName: 'Refresh Environment Variables'
+    - script: '$(PathToJmeter) -n -t $(PathToSolution)/$(ProjectName)/$(ScriptName) -JThreads=$(NumberOfThreads) -JRampUp=$(RampUpDurationInSeconds) -JLoopCount=$(NumberOfLoops)  -JDuration=$(TestDurationInSeconds) -JCsvDirectoryPath=$(PathToSolution)/$(ProjectName) -l $(Agent.TempDirectory)/$(TestReportFolderName)/TestResult.jtl -e -o $(Agent.TempDirectory)/$(TestReportFolderName)'
+      displayName: 'Execute JMeter Test'
+      enabled: true
+    ##TO DO: remove this task, added to mimic the output of the disabled 'Execute JMeter Test' task
+    # - task: CopyFiles@2
+    #   displayName: 'Mock JMeter Output'
+    #   inputs:
+    #     contents: "**"
+    #     sourceFolder: $(System.DefaultWorkingDirectory)/SFA.DAS.API.PerformanceTest/TestReports/
+    #     targetFolder: $(Agent.TempDirectory)/TestReports/
+    #   enabled: true
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Pipeline Artifact'
+      inputs:
+        targetPath: '$(Agent.TempDirectory)/$(TestReportFolderName)/'
+        artifact: TestReport
+      enabled: true
